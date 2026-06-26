@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Core Solver — Visual Graph Editor</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://unpkg.com/reactflow@11/dist/reactflow.min.js"></script>
-<link href="https://unpkg.com/reactflow@11/dist/style.css" rel="stylesheet">
+<script src="libs/react.min.js"></script>
+<script src="libs/react-dom.min.js"></script>
+<script src="libs/babel.min.js"></script>
+<script src="libs/reactflow.min.js"></script>
+<link href="libs/reactflow.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:system-ui,-apple-system,sans-serif;background:#1a1a2e;color:#e0e0e0;overflow:hidden}
@@ -54,6 +54,29 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#1a1a2e;color:#e0
 </style>
 </head>
 <body>
+<div id="fallback-msg" style="display:none;padding:40px;text-align:center;color:#e94560;font-family:system-ui">
+  <h2>⚠️ Scripts failed to load</h2>
+  <p>The CDN (jsdelivr.net) may be blocked on your network.</p>
+  <p>Try one of these:</p>
+  <pre style="text-align:left;display:inline-block;background:#16213e;padding:16px;border-radius:8px">
+# Option 1: Download the files locally
+pip install requests
+python -c "
+import requests, os
+os.makedirs('src/ui/libs', exist_ok=True)
+for url, name in [
+    ('https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js', 'react.min.js'),
+    ('https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js', 'react-dom.min.js'),
+    ('https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js', 'babel.min.js'),
+    ('https://cdn.jsdelivr.net/npm/reactflow@11/dist/reactflow.min.js', 'reactflow.min.js'),
+]:
+    r = requests.get(url, timeout=30)
+    with open(f'src/ui/libs/{name}', 'wb') as f: f.write(r.content)
+    print(f'Downloaded {name}')
+"
+# Then replace CDN URLs with local: src/ui/libs/...
+  </pre>
+</div>
 <div id="root"></div>
 
 <script type="text/babel">

@@ -518,6 +518,9 @@ async def websocket_run(ws: WebSocket):
 _UI_DIR = Path(__file__).parent / "ui"
 _UI_DIR.mkdir(parents=True, exist_ok=True)
 
+# Mount static files directory for JS/CSS libs
+app.mount("/libs", StaticFiles(directory=str(_UI_DIR / "libs")), name="libs")
+
 
 @app.get("/")
 async def serve_ui():
