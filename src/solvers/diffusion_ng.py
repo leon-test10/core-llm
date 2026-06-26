@@ -7,20 +7,21 @@ Solves the G-group coupled system using block Gauss-Seidel power iteration:
     -∇·D_g∇φ_g + Σ_rem,g φ_g = χ_g S_f + Σ_{g'≠g} Σ_s(g'→g) φ_g'
 
   where:
-    Σ_rem,g = Σ_a,g + Σ_{g'} Σ_s(g→g')   (total removal)
+    Σ_rem,g = Σ_a,g + Σ_{g'} Σ_s(g→g')   (total removal, excluding self-scatter)
     S_f = Σ_{g'} νΣ_f,g' φ_g'            (fission source)
 
 The discretization uses cell-centered finite volume on the provided Mesh.
+
+Supports CPU (numpy/scipy) and GPU (CuPy) backends via pluggable backend abstraction.
 """
 
 from typing import Optional
 import numpy as np
-from scipy import sparse
-from scipy.sparse.linalg import spsolve
 
 from ..core.mesh import Mesh
 from ..core.xs_general import MultiGroupXS
 from ..core.result import Result
+from ..core.backends import Backend, get_backend
 
 
 class MultiGroupDiffusionSolver:
@@ -28,17 +29,22 @@ class MultiGroupDiffusionSolver:
 
     Supports 1 to any number of groups. Uses block Gauss-Seidel
     within each power iteration.
+
+    Backend options:
+      - "cpu": numpy + scipy.sparse (always available)
+      - "gpu": CuPy + cupyx.scipy.sparse (requires GPU + CuPy)
+      - "auto": GPU if CuPy available, else CPU
     """
 
     def __init__(
         self,
         mesh: Mesh,
-        xs_provider,  # XSProvider — duck-typed, must provide get_xs() returning MultiGroupXS
+        xs_provider,
         tolerance: float = 1e-8,
         max_iter: int = 500,
-        initial_flux: np.ndarray | None = None,  # shape: (G, n_cells) or (n_cells, G)
+        initial_flux: np.ndarray | None = None,
         initial_keff: float = 1.0,
-        use_gs_acceleration: bool = True,
+        backend: str = "auto",
     ):
         self.mesh = mesh
         self.xs_provider = xs_provider
@@ -46,14 +52,14 @@ class MultiGroupDiffusionSolver:
         self.max_iter = max_iter
         self.initial_flux = initial_flux
         self.initial_keff = initial_keff
-        self.use_gs_acceleration = use_gs_acceleration
 
-        # Cache: cell_id → MultiGroupXS
+        # Backend selection
+        self.backend: Backend = get_backend(backend)
+
+        # Cache
         self._xs_map: dict[int, MultiGroupXS] = {}
         self._n_groups: int = 0
-
-        # Per-group operators (built once, same sparsity pattern for all groups)
-        self._A_g: list[sparse.csr_matrix] = []   # removal + leakage per group
+        self._A_g: list = []  # per-group sparse matrices (backend-specific)
 
     def _fetch_xs(self):
         """Retrieve and validate multi-group cross sections for all cells."""
@@ -93,23 +99,20 @@ class MultiGroupDiffusionSolver:
                         raw.kappaSigma_f, Sigma_s, raw.chi)
             self._xs_map[cell.id] = raw
 
-    def _build_group_operator(self, group: int) -> sparse.csr_matrix:
+    def _build_group_operator(self, group: int):
         """Build A_g = leakage + removal for group g.
 
-        Removal = Σ_a,g + Σ_{g'} Σ_s(g→g') — everything that takes
-        neutrons OUT of group g.
+        Uses the selected backend for sparse matrix construction.
 
-        Returns sparse CSR matrix of size (n_cells, n_cells).
+        Returns backend-specific sparse CSR matrix.
         """
         n = self.mesh.n_cells()
-        A = sparse.lil_matrix((n, n))
+        A = self.backend.lil_matrix((n, n))
 
-        # Diagonal: absorption + total out-scattering removal (NOT self-scatter)
+        # Diagonal: absorption + total out-scattering (NOT self-scatter)
         for cell in self.mesh.cells:
             i = cell.id
             xs = self._xs_map[i]
-            # Total removal from group g:
-            #   absorption + sum of scattering out of g (excluding g→g)
             removal = xs.Sigma_a[group]
             removal += xs.Sigma_s[group, :].sum() - xs.Sigma_s[group, group]
             A[i, i] += removal * cell.volume
@@ -141,7 +144,7 @@ class MultiGroupDiffusionSolver:
                 A[L, R] -= coupling
                 A[R, L] -= coupling
 
-        return A.tocsr()
+        return self.backend.csr_matrix(A)
 
     def solve(self) -> Result:
         """Solve the G-group eigenvalue problem."""
@@ -155,11 +158,11 @@ class MultiGroupDiffusionSolver:
         # Build diagonal fission operator per group (F_g)_{ii} = νΣ_f,g_i * V_i
         F_g = []
         for g in range(G):
-            Fg = sparse.lil_matrix((n, n))
+            Fg = self.backend.lil_matrix((n, n))
             for cell in self.mesh.cells:
                 i = cell.id
                 Fg[i, i] = self._xs_map[i].nuSigma_f[g] * cell.volume
-            F_g.append(Fg.tocsr())
+            F_g.append(self.backend.csr_matrix(Fg))
 
         # Build inscattering source matrices S_{g'→g}: diag(Σ_s(g'→g)_i * V_i)
         S = {}
@@ -167,22 +170,20 @@ class MultiGroupDiffusionSolver:
             for g_to in range(G):
                 if g_from == g_to:
                     continue
-                s_val = self._xs_map[self.mesh.cells[0].id].Sigma_s[g_from, g_to]
-                # Check if any cell has non-zero scattering between these groups
                 has_scatter = any(
                     self._xs_map[c.id].Sigma_s[g_from, g_to] > 0
                     for c in self.mesh.cells
                 )
                 if has_scatter:
-                    Sgg = sparse.lil_matrix((n, n))
+                    Sgg = self.backend.lil_matrix((n, n))
                     for cell in self.mesh.cells:
                         i = cell.id
                         val = self._xs_map[i].Sigma_s[g_from, g_to] * cell.volume
                         if val > 0:
                             Sgg[i, i] = val
-                    S[(g_from, g_to)] = Sgg.tocsr()
+                    S[(g_from, g_to)] = self.backend.csr_matrix(Sgg)
 
-        # Initial flux: shape (G, n)
+        # Initial flux: shape (G, n) — stored as numpy for cross-backend compat
         if self.initial_flux is not None:
             if self.initial_flux.ndim == 2:
                 if self.initial_flux.shape[0] == G:
@@ -205,44 +206,53 @@ class MultiGroupDiffusionSolver:
         for iteration in range(self.max_iter):
             iterations += 1
 
-            # Fission source: S_f = Σ_g νΣ_f,g φ_g (cell-wise)
-            fission_source = np.zeros(n)
+            # Fission source: S_f = Σ_g νΣ_f,g φ_g
+            fission_source = self.backend.zeros(n)
             for g in range(G):
-                fission_source += F_g[g].dot(phi[g])
+                phi_g = self.backend.array(phi[g])
+                fission_source += self.backend.dot(F_g[g], phi_g)
 
             phi_old = phi.copy()
             phi_new = np.zeros((G, n))
 
+            # Fission source as numpy for the source loop
+            fission_source_np = self.backend.asnumpy(fission_source)
+
             # Block Gauss-Seidel: solve each group sequentially
             for g in range(G):
-                # Source for group g:
-                #   source_g = χ_g * S_f + Σ_{g'≠g} Σ_s(g'→g) φ_{g'}  (using latest φ)
-                source = np.zeros(n)
+                source = self.backend.zeros(n)
 
                 # Fission contribution
                 for i in range(n):
                     xi = self._xs_map[i].chi[g]
                     if xi > 0:
-                        source[i] += xi * fission_source[i]
+                        source[i] = xi * fission_source_np[i]
 
-                # Inscattering from other groups (use phi_new for already-solved groups)
+                # Inscattering from other groups
                 for g_from in range(G):
                     if g_from == g:
                         continue
                     key = (g_from, g)
                     if key in S:
-                        # Use phi_new if g_from < g (already updated), else phi_old
-                        phi_src = phi_new[g_from] if g_from < g else phi_old[g_from]
-                        source += S[key].dot(phi_src)
+                        phi_src = self.backend.array(
+                            phi_new[g_from] if g_from < g else phi_old[g_from]
+                        )
+                        source += self.backend.dot(S[key], phi_src)
 
                 # Solve A_g φ_g = source
-                phi_new[g] = spsolve(self._A_g[g], source)
+                phi_new[g] = self.backend.asnumpy(
+                    self.backend.spsolve(self._A_g[g], source)
+                )
 
             # Update keff: ratio of new to old fission source integral
-            fission_new = np.zeros(n)
+            fission_new = self.backend.zeros(n)
             for g in range(G):
-                fission_new += F_g[g].dot(phi_new[g])
-            keff_new = fission_new.sum() / fission_source.sum() if fission_source.sum() > 0 else 0.0
+                phi_ng = self.backend.array(phi_new[g])
+                fission_new += self.backend.dot(F_g[g], phi_ng)
+
+            fs_old_sum = self.backend.sum(fission_source)
+            fs_new_sum = self.backend.sum(fission_new)
+            keff_new = fs_new_sum / fs_old_sum if fs_old_sum > 0 else 0.0
 
             # Normalize: total flux sum = 1
             total = phi_new.sum()
@@ -280,9 +290,9 @@ class MultiGroupDiffusionSolver:
 
         return Result(
             case_name="",
-            solver=f"steady_diffusion_{G}g",
+            solver=f"steady_diffusion_{G}g_{self.backend.name}",
             keff=float(keff),
-            flux=phi,  # shape (G, n)
+            flux=phi,
             power=power,
             converged=converged,
             iterations=iterations,

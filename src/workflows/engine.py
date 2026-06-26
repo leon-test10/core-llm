@@ -303,6 +303,7 @@ class WorkflowEngine:
                 max_iter=max_iter,
                 initial_flux=initial_flux,
                 initial_keff=initial_keff,
+                backend=inputs.get("backend", "auto"),
             )
         else:
             raise ValueError(f"Unknown solver mode: {mode}. "
