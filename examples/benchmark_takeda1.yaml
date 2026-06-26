@@ -1,0 +1,133 @@
+# Workflow: Takeda Model 1 benchmark validation
+#
+# Runs the Takeda benchmark (quarter-core, 2-group, 2D)
+# and compares with published reference keff.
+#
+# This is the SIMPLEST possible validation benchmark:
+#   - 2 groups (fast + thermal)
+#   - 3 materials (core, blanket, reflector)
+#   - Quarter symmetry
+#   - Published reference keff = 0.9779 (diffusion)
+#
+# Usage:
+#   python -m src.cli run examples/benchmark_takeda1.yaml
+
+workflow:
+  name: benchmark_takeda1
+
+  steps:
+    - id: build_mesh
+      skill: mesh_builder
+      input:
+        type: regular_2d
+        nx: 40
+        ny: 40
+        dx: 0.75
+        dy: 0.75
+        material_map:
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, core, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, blanket, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+        boundary_x: reflective
+        boundary_y: reflective
+
+    - id: register_materials
+      skill: material_registry
+      input:
+        materials:
+          core: { name: "Fast Reactor Core", xs_provider: constant_2g }
+          blanket: { name: "Radial Blanket", xs_provider: constant_2g }
+          reflector: { name: "Reflector", xs_provider: constant_2g }
+
+    - id: xs_provider
+      skill: constant_xs
+      input:
+        materials_xs:
+          core:
+            D: [1.4, 0.4]
+            Sigma_a: [0.010, 0.080]
+            nuSigma_f: [0.006, 0.120]
+            Sigma_s: [[0.0, 0.020], [0.0, 0.0]]
+            chi: [1.0, 0.0]
+            kappaSigma_f: [1.0, 1.0]
+          blanket:
+            D: [1.4, 0.4]
+            Sigma_a: [0.005, 0.040]
+            nuSigma_f: [0.0, 0.0]
+            Sigma_s: [[0.0, 0.020], [0.0, 0.0]]
+            chi: [0.0, 0.0]
+            kappaSigma_f: [0.0, 0.0]
+          reflector:
+            D: [1.2, 0.3]
+            Sigma_a: [0.001, 0.010]
+            nuSigma_f: [0.0, 0.0]
+            Sigma_s: [[0.0, 0.030], [0.0, 0.0]]
+            chi: [0.0, 0.0]
+            kappaSigma_f: [0.0, 0.0]
+        group_count: 2
+
+    - id: solve
+      skill: steady_diffusion_solver
+      input:
+        mesh: "{{ build_mesh.mesh }}"
+        xs_provider: "{{ xs_provider.xs_provider }}"
+        mode: two_group
+        tolerance: 1.0e-10
+        max_iter: 2000
+
+    - id: compare
+      skill: benchmark_compare
+      input:
+        result: "{{ solve.result }}"
+        benchmark: takeda1
+        ref_keff: 0.9779
+        tolerance_pcm: 500
+
+    - id: report
+      skill: report_writer
+      input:
+        result: "{{ solve.result }}"
+        mesh: "{{ build_mesh.mesh }}"
+        case_name: benchmark_takeda1
+        output_dir: outputs
+
+  outputs:
+    - "{{ solve.keff }}"
+    - "{{ compare.comparison }}"

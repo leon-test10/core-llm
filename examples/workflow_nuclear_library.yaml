@@ -1,0 +1,70 @@
+# Workflow: using nuclear data library (builtin approximate cross sections)
+#
+# This workflow uses the NuclearDataLibrary with built-in rough 1-group
+# cross sections for U-235, H2O, etc. instead of toy constant values.
+#
+# NOTE: These builtin values are approximate and for demo only.
+# For better accuracy, use:
+#   python -m src.cli download --source=tendl
+# to download real ENDF data files.
+
+workflow:
+  name: nuclear_library_demo
+
+  steps:
+    - id: build_mesh
+      skill: mesh_builder
+      input:
+        type: regular_2d
+        nx: 8
+        ny: 8
+        dx: 1.0
+        dy: 1.0
+        material_map:
+          - [H1_H2O, H1_H2O, H1_H2O, H1_H2O, H1_H2O, H1_H2O, H1_H2O, H1_H2O]
+          - [H1_H2O, H1_H2O, H1_H2O, U235,    U235,    H1_H2O, H1_H2O, H1_H2O]
+          - [H1_H2O, H1_H2O, U235,   U235,    U235,    U235,   H1_H2O, H1_H2O]
+          - [H1_H2O, U235,   U235,   U235,    U235,    U235,   U235,   H1_H2O]
+          - [H1_H2O, U235,   U235,   U235,    U235,    U235,   U235,   H1_H2O]
+          - [H1_H2O, H1_H2O, U235,   U235,    U235,    U235,   H1_H2O, H1_H2O]
+          - [H1_H2O, H1_H2O, H1_H2O, U235,    U235,    H1_H2O, H1_H2O, H1_H2O]
+          - [H1_H2O, H1_H2O, H1_H2O, H1_H2O, H1_H2O, H1_H2O, H1_H2O, H1_H2O]
+        boundary_x: vacuum
+        boundary_y: vacuum
+
+    - id: register_materials
+      skill: material_registry
+      input:
+        materials:
+          U235:    { name: "U-235 Fuel",    xs_provider: nuclear_library }
+          U238:    { name: "U-238",          xs_provider: nuclear_library }
+          Pu239:   { name: "Pu-239",         xs_provider: nuclear_library }
+          H1_H2O:  { name: "Water Moderator", xs_provider: nuclear_library }
+          B10:     { name: "B-10 Absorber",  xs_provider: nuclear_library }
+
+    - id: xs_provider
+      skill: nuclear_library
+      input:
+        data_dir: data/nuclear_library
+        group_count: 1
+        download: false   # Uses builtin; set to true to download TENDL
+
+    - id: solve
+      skill: steady_diffusion_solver
+      input:
+        mesh: "{{ build_mesh.mesh }}"
+        xs_provider: "{{ xs_provider.xs_provider }}"
+        mode: one_group
+        tolerance: 1.0e-8
+        max_iter: 500
+
+    - id: report
+      skill: report_writer
+      input:
+        result: "{{ solve.result }}"
+        mesh: "{{ build_mesh.mesh }}"
+        case_name: nuclear_library_demo
+        output_dir: outputs
+
+  outputs:
+    - "{{ solve.keff }}"

@@ -1,0 +1,70 @@
+# Workflow: steady-state with control rod inserted
+#
+# Same as steady_diffusion_demo but with a control rod at center.
+# Demonstrates keff drop and power redistribution.
+
+workflow:
+  name: steady_diffusion_control_rod
+
+  steps:
+    - id: build_mesh
+      skill: mesh_builder
+      input:
+        type: regular_2d
+        nx: 10
+        ny: 10
+        dx: 1.0
+        dy: 1.0
+        material_map:
+          - [reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      control_rod, fuel,   moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+        boundary_x: vacuum
+        boundary_y: vacuum
+
+    - id: register_materials
+      skill: material_registry
+      input:
+        materials:
+          fuel: { name: "UO2 Fuel", xs_provider: constant_1g }
+          moderator: { name: "Light Water", xs_provider: constant_1g }
+          control_rod: { name: "B4C Rod", xs_provider: constant_1g }
+          reflector: { name: "Reflector", xs_provider: constant_1g }
+
+    - id: xs_provider
+      skill: constant_xs
+      input:
+        materials_xs:
+          fuel:        { D: 1.2, Sigma_a: 0.010, nuSigma_f: 0.014, kappaSigma_f: 1.0 }
+          moderator:   { D: 2.0, Sigma_a: 0.001, nuSigma_f: 0.0,   kappaSigma_f: 0.0 }
+          control_rod: { D: 0.8, Sigma_a: 0.080, nuSigma_f: 0.0,   kappaSigma_f: 0.0 }
+          reflector:   { D: 1.8, Sigma_a: 0.002, nuSigma_f: 0.0,   kappaSigma_f: 0.0 }
+        group_count: 1
+
+    - id: solve
+      skill: steady_diffusion_solver
+      input:
+        mesh: "{{ build_mesh.mesh }}"
+        xs_provider: "{{ xs_provider.xs_provider }}"
+        mode: one_group
+        tolerance: 1.0e-8
+        max_iter: 500
+
+    - id: report
+      skill: report_writer
+      input:
+        result: "{{ solve.result }}"
+        mesh: "{{ build_mesh.mesh }}"
+        case_name: control_rod_inserted
+        output_dir: outputs
+
+  outputs:
+    - "{{ solve.keff }}"
+    - "{{ solve.iterations }}"

@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Outputs (generated results)
+outputs/*.json
+outputs/*.npy
+outputs/*.png
+outputs/*.html
+outputs/*.md
+
+# Keep the outputs directory
+!outputs/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Nuclear data files (large)
+data/nuclear_library/*.tendl
+data/nuclear_library/*.endf
+data/nuclear_library/*.dat

@@ -1,0 +1,147 @@
+# Workflow: visualize solver results
+#
+# This workflow demonstrates the renderer skill:
+#   1. Solves the steady diffusion problem
+#   2. Generates multiple visualizations:
+#      - Power heatmap
+#      - Flux 3D surface
+#      - Convergence plot
+#      - Material layout map
+#      - Full dashboard
+#
+# Usage:
+#   python -m src.cli run examples/workflow_visualize_results.yaml
+
+workflow:
+  name: visualize_results_demo
+
+  steps:
+    - id: build_mesh
+      skill: mesh_builder
+      input:
+        type: regular_2d
+        nx: 10
+        ny: 10
+        dx: 1.0
+        dy: 1.0
+        material_map:
+          - [reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+        boundary_x: vacuum
+        boundary_y: vacuum
+
+    - id: register_materials
+      skill: material_registry
+      input:
+        materials:
+          fuel: { name: "UO2 Fuel", xs_provider: constant_1g }
+          moderator: { name: "Light Water", xs_provider: constant_1g }
+          reflector: { name: "Reflector", xs_provider: constant_1g }
+
+    - id: xs_provider
+      skill: constant_xs
+      input:
+        materials_xs:
+          fuel:      { D: 1.2, Sigma_a: 0.010, nuSigma_f: 0.014, kappaSigma_f: 1.0 }
+          moderator: { D: 2.0, Sigma_a: 0.001, nuSigma_f: 0.0,   kappaSigma_f: 0.0 }
+          reflector: { D: 1.8, Sigma_a: 0.002, nuSigma_f: 0.0,   kappaSigma_f: 0.0 }
+        group_count: 1
+
+    - id: solve
+      skill: steady_diffusion_solver
+      input:
+        mesh: "{{ build_mesh.mesh }}"
+        xs_provider: "{{ xs_provider.xs_provider }}"
+        mode: one_group
+        tolerance: 1.0e-8
+        max_iter: 500
+
+    # -- Visualizations -------------------------------------------------
+
+    - id: plot_power
+      skill: renderer
+      input:
+        recipe: power_heatmap
+        power: "{{ solve.power }}"
+        mesh: "{{ build_mesh.mesh }}"
+        output_path: power_heatmap.png
+        title: "Power Distribution (2D)"
+
+    - id: plot_flux
+      skill: renderer
+      input:
+        recipe: flux_heatmap
+        flux: "{{ solve.flux }}"
+        mesh: "{{ build_mesh.mesh }}"
+        output_path: flux_heatmap.png
+        title: "Neutron Flux Distribution"
+
+    - id: plot_convergence
+      skill: renderer
+      input:
+        recipe: convergence
+        residual_history: "{{ solve.result }}"
+        output_path: convergence.png
+        title: "Solver Convergence"
+
+    - id: plot_material
+      skill: renderer
+      input:
+        recipe: material_layout
+        material_map:
+          - [reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+        output_path: material_layout.png
+        title: "Material Layout"
+
+    - id: plot_dashboard
+      skill: renderer
+      input:
+        recipe: dashboard
+        flux: "{{ solve.flux }}"
+        power: "{{ solve.power }}"
+        mesh: "{{ build_mesh.mesh }}"
+        material_map:
+          - [reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+          - [reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+        output_path: dashboard.png
+        title: "Core Solver Results Dashboard"
+
+    - id: report
+      skill: report_writer
+      input:
+        result: "{{ solve.result }}"
+        mesh: "{{ build_mesh.mesh }}"
+        case_name: visualize_demo
+        output_dir: outputs
+
+  outputs:
+    - "{{ solve.keff }}"
+    - "{{ plot_power.output_path }}"
+    - "{{ plot_flux.output_path }}"
+    - "{{ plot_convergence.output_path }}"
+    - "{{ plot_dashboard.output_path }}"

@@ -1,0 +1,73 @@
+# Example: 2D mini-reactor with fixed single-group cross sections
+# 
+# Layout: 10x10 grid
+#   - 4x4 fuel region in center
+#   - Moderator (water) surrounding
+#   - Optional control rod in center
+#
+# This is a toy problem for algorithm validation ONLY.
+# Cross sections are dimensionless toy values.
+
+case:
+  name: simple_2d_core
+  physics: one_group_diffusion
+
+mesh:
+  type: regular_2d
+  nx: 10
+  ny: 10
+  dx: 1.0
+  dy: 1.0
+  boundary_x: vacuum
+  boundary_y: vacuum
+
+materials:
+  fuel:
+    name: "UO2 Fuel (toy)"
+    xs_provider: constant_1g
+    D: 1.2
+    Sigma_a: 0.010
+    nuSigma_f: 0.014
+    kappaSigma_f: 1.0
+
+  moderator:
+    name: "Light Water (toy)"
+    xs_provider: constant_1g
+    D: 2.0
+    Sigma_a: 0.001
+    nuSigma_f: 0.0
+    kappaSigma_f: 0.0
+
+  control_rod:
+    name: "B4C Control Rod (toy)"
+    xs_provider: constant_1g
+    D: 0.8
+    Sigma_a: 0.080
+    nuSigma_f: 0.0
+    kappaSigma_f: 0.0
+
+  reflector:
+    name: "Reflector (toy)"
+    xs_provider: constant_1g
+    D: 1.8
+    Sigma_a: 0.002
+    nuSigma_f: 0.0
+    kappaSigma_f: 0.0
+
+layout:
+  material_map:
+    - [reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+    - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+    - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+    - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+    - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+    - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+    - [reflector, moderator, moderator, fuel,      fuel,      fuel,      fuel,      moderator, moderator, reflector]
+    - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+    - [reflector, moderator, moderator, moderator, moderator, moderator, moderator, moderator, moderator, reflector]
+    - [reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector, reflector]
+
+solver:
+  type: steady_diffusion
+  tolerance: 1.0e-8
+  max_iter: 500
