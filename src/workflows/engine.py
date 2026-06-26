@@ -17,6 +17,7 @@ from ..core.result import Result
 
 from ..solvers.diffusion_1g import OneGroupDiffusionSolver
 from ..solvers.diffusion_2g import TwoGroupDiffusionSolver
+from ..solvers.diffusion_ng import MultiGroupDiffusionSolver
 from ..solvers.postprocess import PowerPostprocessor, ReportWriter
 
 from ..visualization.renderer import Renderer, PlotSpec
@@ -216,24 +217,34 @@ class WorkflowEngine:
         if isinstance(materials_xs, str):
             with open(materials_xs) as f:
                 materials_xs = yaml.safe_load(f)
-        # Also check if materials from registry contain XS
         if not materials_xs and "materials" in inputs:
             materials_data = inputs["materials"]
             if isinstance(materials_data, dict):
                 materials_xs = materials_data
 
-        group_count = inputs.get("group_count", inputs.get("mode", 1))
-        if group_count == "one_group" or group_count == 1:
-            group_count = 1
-        elif group_count == "two_group" or group_count == 2:
-            group_count = 2
+        # Auto-detect group count from the first material's D field
+        group_count = inputs.get("group_count", inputs.get("mode", None))
+        if group_count is not None and str(group_count).lower() in ("auto", "detect", "none"):
+            group_count = None
+        elif group_count is not None:
+            try:
+                group_count = int(group_count)
+            except (ValueError, TypeError):
+                # Could be "one_group" etc.
+                mode_str = str(group_count).lower()
+                if mode_str in ("one_group", "1g", "1"):
+                    group_count = 1
+                elif mode_str in ("two_group", "2g", "2"):
+                    group_count = 2
+                else:
+                    group_count = None  # auto-detect
 
         provider = create_xs_provider(
             "constant",
             materials_xs=materials_xs,
             group_count=group_count,
         )
-        return {"xs_provider": provider, "group_count": group_count}
+        return {"xs_provider": provider, "group_count": provider.get_group_count()}
 
     def _skill_xs_nuclear(self, inputs: dict) -> dict:
         """Build nuclear data library XS provider."""
@@ -264,7 +275,9 @@ class WorkflowEngine:
         initial_flux = inputs.get("initial_flux")
         initial_keff = inputs.get("initial_keff", 1.0)
 
-        if mode in ("one_group", "1g", 1):
+        # Resolve legacy mode names
+        mode_str = str(mode).lower()
+        if mode_str in ("one_group", "1g", "1"):
             solver = OneGroupDiffusionSolver(
                 mesh=mesh,
                 xs_provider=xs_provider,
@@ -273,7 +286,7 @@ class WorkflowEngine:
                 initial_flux=initial_flux,
                 initial_keff=initial_keff,
             )
-        elif mode in ("two_group", "2g", 2):
+        elif mode_str in ("two_group", "2g", "2"):
             solver = TwoGroupDiffusionSolver(
                 mesh=mesh,
                 xs_provider=xs_provider,
@@ -282,8 +295,18 @@ class WorkflowEngine:
                 initial_flux=initial_flux,
                 initial_keff=initial_keff,
             )
+        elif mode_str in ("multi_group", "ng", "n_group", "auto", "general"):
+            solver = MultiGroupDiffusionSolver(
+                mesh=mesh,
+                xs_provider=xs_provider,
+                tolerance=tolerance,
+                max_iter=max_iter,
+                initial_flux=initial_flux,
+                initial_keff=initial_keff,
+            )
         else:
-            raise ValueError(f"Unknown solver mode: {mode}")
+            raise ValueError(f"Unknown solver mode: {mode}. "
+                           f"Use one_group, two_group, or multi_group")
 
         result = solver.solve()
         return {

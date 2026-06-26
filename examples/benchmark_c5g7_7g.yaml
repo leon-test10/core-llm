@@ -1,0 +1,136 @@
+# Workflow: C5G7 7-group benchmark (homogenized assembly)
+#
+# Tests the multi-group solver with 7 energy groups.
+# Uses C5G7 benchmark cross sections from the published NEA specification.
+#
+# NOTE: This homogenizes each assembly into a single cell with
+# flux-volume-weighted cross sections. The C5G7 benchmark is
+# designed for pin-by-pin transport, so a coarse-mesh diffusion
+# solution will have ~1000-3000 pcm errors due to homogenization.
+#
+# Reference keff (MCNP, 2x2 assembly): 1.18655
+#
+# Usage:
+#   python -m src.cli run examples/benchmark_c5g7_7g.yaml
+
+workflow:
+  name: benchmark_c5g7_7g
+
+  steps:
+    - id: build_mesh
+      skill: mesh_builder
+      input:
+        type: regular_2d
+        nx: 2
+        ny: 2
+        dx: 21.42
+        dy: 21.42
+        material_map:
+          - [mox43, uo2]
+          - [mox70, mox87]
+        boundary_x: reflective
+        boundary_y: reflective
+
+    - id: register_materials
+      skill: material_registry
+      input:
+        materials:
+          uo2: { name: "UO2 Assembly", xs_provider: constant_ng }
+          mox43: { name: "MOX 4.3% Assembly", xs_provider: constant_ng }
+          mox70: { name: "MOX 7.0% Assembly", xs_provider: constant_ng }
+          mox87: { name: "MOX 8.7% Assembly", xs_provider: constant_ng }
+
+    - id: xs_provider
+      skill: constant_xs
+      input:
+        materials_xs:
+          uo2:
+            D: [1.26791, 1.45382, 1.26134, 1.16339, 1.14845, 1.22099, 1.27828]
+            Sigma_a: [0.0080248, 0.0037174, 0.026769, 0.096236, 0.030020, 0.11126, 0.28278]
+            nuSigma_f: [0.00721206, 0.000819301, 0.00645320, 0.0185648, 0.0178084, 0.0830348, 0.216004]
+            chi: [0.58791, 0.41176, 0.00033906, 0.00000011761, 0.0, 0.0, 0.0]
+            Sigma_s:
+              - [0.127537, 0.042378, 0.0000094374, 0.0000000055163, 0.0, 0.0, 0.0]
+              - [0.0, 0.324456, 0.0016314, 0.0000000031427, 0.0, 0.0, 0.0]
+              - [0.0, 0.0, 0.450940, 0.0026792, 0.0, 0.0, 0.0]
+              - [0.0, 0.0, 0.0, 0.452565, 0.0055664, 0.0, 0.0]
+              - [0.0, 0.0, 0.0, 0.00012525, 0.271401, 0.010255, 0.0]
+              - [0.0, 0.0, 0.0, 0.0, 0.0012968, 0.265802, 0.016809]
+              - [0.0, 0.0, 0.0, 0.0, 0.0, 0.0085458, 0.273080]
+            kappaSigma_f: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+          mox43:
+            D: [1.26791, 1.45382, 1.19158, 1.10303, 1.08777, 1.17603, 1.24434]
+            Sigma_a: [0.0084339, 0.0037577, 0.027970, 0.10421, 0.13994, 0.40918, 0.40935]
+            nuSigma_f: [0.00762704, 0.000876898, 0.00569835, 0.0189190, 0.0170382, 0.0923718, 0.244526]
+            chi: [0.58791, 0.41176, 0.00033906, 0.00000011761, 0.0, 0.0, 0.0]
+            Sigma_s:
+              - [0.128876, 0.041413, 0.000008229, 0.0000000050405, 0.0, 0.0, 0.0]
+              - [0.0, 0.325452, 0.0016395, 0.0000000015982, 0.0, 0.0, 0.0]
+              - [0.0, 0.0, 0.453188, 0.0026142, 0.0, 0.0, 0.0]
+              - [0.0, 0.0, 0.0, 0.457173, 0.0055394, 0.0, 0.0]
+              - [0.0, 0.0, 0.0, 0.00016046, 0.276814, 0.0093127, 0.0]
+              - [0.0, 0.0, 0.0, 0.0, 0.0020051, 0.252962, 0.014850]
+              - [0.0, 0.0, 0.0, 0.0, 0.0, 0.0084948, 0.265007]
+            kappaSigma_f: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+          mox70:
+            D: [1.26791, 1.45382, 1.16488, 1.07434, 1.06010, 1.15889, 1.23238]
+            Sigma_a: [0.0090657, 0.0042967, 0.031576, 0.11735, 0.14478, 0.42429, 0.44710]
+            nuSigma_f: [0.00825446, 0.00132565, 0.00625259, 0.0205201, 0.0186184, 0.0971416, 0.265709]
+            chi: [0.58791, 0.41176, 0.00033906, 0.00000011761, 0.0, 0.0, 0.0]
+            Sigma_s:
+              - [0.130457, 0.041792, 0.0000085105, 0.0000000051329, 0.0, 0.0, 0.0]
+              - [0.0, 0.328428, 0.0016436, 0.0000000022017, 0.0, 0.0, 0.0]
+              - [0.0, 0.0, 0.458371, 0.0025331, 0.0, 0.0, 0.0]
+              - [0.0, 0.0, 0.0, 0.463709, 0.0054766, 0.0, 0.0]
+              - [0.0, 0.0, 0.0, 0.00017619, 0.282313, 0.0087289, 0.0]
+              - [0.0, 0.0, 0.0, 0.0, 0.0022760, 0.249751, 0.013114]
+              - [0.0, 0.0, 0.0, 0.0, 0.0, 0.0088645, 0.259529]
+            kappaSigma_f: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+          mox87:
+            D: [1.26791, 1.45382, 1.15102, 1.05895, 1.04536, 1.15088, 1.22690]
+            Sigma_a: [0.0094862, 0.0046556, 0.033358, 0.12350, 0.14622, 0.43135, 0.46167]
+            nuSigma_f: [0.00867209, 0.00162426, 0.00655750, 0.0213855, 0.0192976, 0.0994682, 0.277487]
+            chi: [0.58791, 0.41176, 0.00033906, 0.00000011761, 0.0, 0.0, 0.0]
+            Sigma_s:
+              - [0.131504, 0.042046, 0.0000086972, 0.0000000051938, 0.0, 0.0, 0.0]
+              - [0.0, 0.330403, 0.0016463, 0.0000000026006, 0.0, 0.0, 0.0]
+              - [0.0, 0.0, 0.461792, 0.0024749, 0.0, 0.0, 0.0]
+              - [0.0, 0.0, 0.0, 0.468021, 0.0054330, 0.0, 0.0]
+              - [0.0, 0.0, 0.0, 0.00018597, 0.285771, 0.0083973, 0.0]
+              - [0.0, 0.0, 0.0, 0.0, 0.0023916, 0.247614, 0.012322]
+              - [0.0, 0.0, 0.0, 0.0, 0.0, 0.0089681, 0.256093]
+            kappaSigma_f: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        group_count: auto
+
+    - id: solve
+      skill: steady_diffusion_solver
+      input:
+        mesh: "{{ build_mesh.mesh }}"
+        xs_provider: "{{ xs_provider.xs_provider }}"
+        mode: multi_group
+        tolerance: 1.0e-10
+        max_iter: 2000
+
+    - id: compare
+      skill: benchmark_compare
+      input:
+        result: "{{ solve.result }}"
+        benchmark: "C5G7 2x2 Assembly (homogenized, 7-group)"
+        ref_keff: 1.18655
+        tolerance_pcm: 5000
+        notes: "Coarse-mesh homogenized diffusion expected to underpredict by 1000-3000 pcm"
+
+    - id: report
+      skill: report_writer
+      input:
+        result: "{{ solve.result }}"
+        mesh: "{{ build_mesh.mesh }}"
+        case_name: benchmark_c5g7_7g
+        output_dir: outputs
+
+  outputs:
+    - "{{ solve.keff }}"
+    - "{{ compare.summary }}"

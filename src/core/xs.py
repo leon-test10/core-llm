@@ -88,23 +88,43 @@ class ConstantXSProvider(XSProvider):
 
     provider_id = "constant"
 
-    def __init__(self, materials_xs: dict[str, dict], group_count: int = 1):
+    def __init__(self, materials_xs: dict[str, dict], group_count: int | None = 1):
         """
         Args:
             materials_xs: {material_id: {field: value, ...}}
                 For 1-group: {D, Sigma_a, nuSigma_f, kappaSigma_f}
                 For 2-group: {D: [D0,D1], Sigma_a: [...], ...}
-            group_count: 1 or 2
+                For N-group: {D: [...], Sigma_a: [...], Sigma_s: [[...],...], chi: [...]}
+            group_count: 1, 2, or None (auto-detect from data)
         """
         self._xs = materials_xs
         self._group_count = group_count
         self._cache: dict[str, CrossSection] = {}
+
+    def get_group_count(self) -> int:
+        if self._group_count is not None:
+            return self._group_count
+        # Auto-detect from first material's D field
+        if self._xs:
+            first = next(iter(self._xs.values()))
+            d_val = first.get("D")
+            if isinstance(d_val, list):
+                return len(d_val)
+        return 1
 
     def get_xs(self, material_id: str, state: "CellState | None" = None) -> CrossSection:
         if material_id in self._cache:
             return self._cache[material_id]
 
         raw = self._xs[material_id]
+        # Detect group count from the data format
+        if self._group_count is None:
+            # Auto-detect: if D is a list, group_count = len(D)
+            if isinstance(raw.get("D"), list):
+                self._group_count = len(raw["D"])
+            else:
+                self._group_count = 1
+
         if self._group_count == 1:
             xs = OneGroupXS(
                 D=raw["D"],
@@ -113,7 +133,7 @@ class ConstantXSProvider(XSProvider):
                 kappaSigma_f=raw.get("kappaSigma_f", 1.0),
                 Sigma_s=raw.get("Sigma_s", 0.0),
             )
-        else:
+        elif self._group_count == 2:
             xs = TwoGroupXS(
                 D=raw["D"],
                 Sigma_a=raw["Sigma_a"],
@@ -122,6 +142,10 @@ class ConstantXSProvider(XSProvider):
                 Sigma_s=raw["Sigma_s"],
                 chi=raw["chi"],
             )
+        else:
+            # General N-group → return MultiGroupXS
+            from .xs_general import MultiGroupXS
+            xs = MultiGroupXS.from_dict(raw)
         self._cache[material_id] = xs
         return xs
 
