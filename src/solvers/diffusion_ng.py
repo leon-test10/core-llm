@@ -32,8 +32,10 @@ class MultiGroupDiffusionSolver:
 
     Backend options:
       - "cpu": numpy + scipy.sparse (always available)
-      - "gpu": CuPy + cupyx.scipy.sparse (requires GPU + CuPy)
-      - "auto": GPU if CuPy available, else CPU
+      - "cuda": NVIDIA GPU via CuPy (pip install cupy-cuda12x)
+      - "rocm": AMD GPU via CuPy (pip install cupy-rocm-*-12x)
+      - "gpu": any GPU (auto-detect NVIDIA or AMD)
+      - "auto": GPU if available, else CPU (default)
     """
 
     def __init__(

@@ -70,6 +70,36 @@ def cmd_download(args):
         print(f"  {nid}: {path.name} ({size_kb:.1f} KB)")
 
 
+def cmd_gpu_status(args):
+    """Display GPU availability and installation guidance."""
+    from .core.backends import gpu_available, gpu_vendor, gpu_info
+
+    print("GPU Acceleration Status")
+    print("=" * 60)
+    print(f"  Available: {gpu_available()}")
+    print(f"  Vendor:    {gpu_vendor() or 'none'}")
+    print(f"  Info:      {gpu_info()}")
+    print()
+
+    if not gpu_available():
+        print("Installation Instructions:")
+        print()
+        print("  NVIDIA GPU:")
+        print("    pip install cupy-cuda12x")
+        print()
+        print("  AMD GPU:")
+        print("    # First install ROCm (see: https://rocm.docs.amd.com)")
+        print("    # Then install CuPy for ROCm:")
+        print("    pip install cupy-rocm-6-0  # match your ROCm version")
+        print()
+        print("  Then set backend: gpu in your workflow YAML:")
+        print("    backend: gpu    # or: cuda / rocm / auto")
+        print()
+    else:
+        print(f"  Ready to use. Set backend: gpu in workflow YAML.")
+        print(f"  Or use Python: MultiGroupDiffusionSolver(..., backend='gpu')")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Core Solver Demo — modular reactor physics framework",
@@ -93,6 +123,9 @@ def main():
     p_dl.add_argument("--dir", default="data/nuclear_library",
                       help="Target directory")
 
+    # gpu-status
+    p_gpu = sub.add_parser("gpu-status", help="Check GPU acceleration status")
+
     args = parser.parse_args()
 
     if args.command == "run":
@@ -101,6 +134,8 @@ def main():
         cmd_validate(args)
     elif args.command == "download":
         cmd_download(args)
+    elif args.command == "gpu-status":
+        cmd_gpu_status(args)
     else:
         parser.print_help()
 
