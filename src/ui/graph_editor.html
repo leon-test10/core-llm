@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Core Solver — Visual Graph Editor</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/reactflow@11/dist/reactflow.min.js"></script>
+<link href="https://unpkg.com/reactflow@11/dist/style.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:#1a1a2e;color:#e0e0e0;overflow:hidden}
+#root{display:flex;height:100vh;width:100vw}
+.sidebar{width:260px;background:#16213e;border-right:1px solid #0f3460;display:flex;flex-direction:column;overflow-y:auto}
+.sidebar h3{padding:16px;color:#e94560;font-size:14px;text-transform:uppercase;letter-spacing:1px}
+.skill-item{padding:10px 14px;margin:4px 8px;border-radius:6px;cursor:grab;font-size:13px;display:flex;align-items:center;gap:8px;transition:all .15s}
+.skill-item:hover{filter:brightness(1.2);transform:translateX(2px)}
+.skill-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.skill-name{font-weight:600}
+.skill-desc{font-size:11px;color:#888;margin-top:2px}
+.canvas{flex:1;position:relative}
+.run-bar{display:flex;align-items:center;gap:12px;padding:8px 16px;background:#0f3460;border-bottom:1px solid #1a1a4e}
+.run-btn{padding:8px 20px;background:#e94560;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:14px}
+.run-btn:hover{background:#ff6b81}
+.run-btn:disabled{background:#555;cursor:not-allowed}
+.status{font-size:13px;color:#aaa}
+.status.running{color:#FF9800}
+.status.done{color:#4CAF50}
+.status.error{color:#F44336}
+.node-card{background:#1a1a3e;border:2px solid #333;border-radius:10px;padding:0;min-width:180px;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.node-card.running{border-color:#FF9800;box-shadow:0 0 12px rgba(255,152,0,.3)}
+.node-card.done{border-color:#4CAF50}
+.node-card.error{border-color:#F44336}
+.node-header{padding:8px 12px;border-radius:8px 8px 0 0;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px}
+.node-body{padding:4px 0}
+.port-row{display:flex;align-items:center;padding:3px 12px;font-size:11px}
+.port-dot{width:8px;height:8px;border-radius:50%;border:2px solid #555;background:#1a1a3e;margin:0 6px}
+.port-dot.input{margin-right:8px}
+.port-dot.output{margin-left:auto}
+.port-label{flex:1;color:#aaa}
+.port-value{color:#e94560;font-size:10px;max-width:80px;overflow:hidden;text-overflow:ellipsis}
+.context-menu{position:fixed;background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:4px 0;min-width:160px;z-index:1000;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+.context-item{padding:8px 16px;cursor:pointer;font-size:13px}
+.context-item:hover{background:#0f3460}
+.edge-label{font-size:10px;fill:#888}
+.param-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#16213e;border:1px solid #0f3460;border-radius:12px;padding:20px;z-index:2000;min-width:320px;box-shadow:0 16px 48px rgba(0,0,0,.8)}
+.param-modal h3{color:#e94560;margin-bottom:12px}
+.param-modal input,.param-modal select{width:100%;padding:8px;margin:4px 0 12px;background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;color:#e0e0e0;font-size:13px}
+.param-modal button{padding:8px 20px;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:8px}
+.param-save{background:#4CAF50;color:#fff}
+.param-cancel{background:#555;color:#fff}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const {useState,useCallback,useEffect,useRef,useMemo,createContext,useContext} = React;
+const ReactFlow=window.ReactFlow;
+const {Handle,Position,useReactFlow,ReactFlowProvider,addEdge,useNodesState,useEdgesState,Controls,Background,MiniMap,Panel} = ReactFlow;
+
+// ── Constants ─────────────────────────────────────────────────────────
+
+const API_BASE = window.location.origin.replace(':8501',':8600');
+
+const TYPE_COLORS = {
+  mesh:"#4CAF50", xs_provider:"#2196F3", flux_array:"#FF9800",
+  power_array:"#F44336", float:"#9C27B0", image:"#00BCD4",
+  report:"#795548", any:"#607D8B", material_registry:"#E91E63",
+};
+
+// ── Custom Node Component ──────────────────────────────────────────────
+
+function SkillNode({id,data}) {
+  const skill = data.skill || {};
+  const inputs = skill.inputs || [];
+  const outputs = skill.outputs || [];
+  const status = data.status || 'idle';
+  const nodeResults = data.results || {};
+
+  return (
+    <div className={`node-card ${status}`}>
+      <div className="node-header" style={{background:skill.color||'#607D8B'}}>
+        <span>{skill.name||data.label||id}</span>
+        {status==='running' && <span style={{fontSize:10,marginLeft:'auto'}}>⏳</span>}
+        {status==='done' && <span style={{fontSize:10,marginLeft:'auto'}}>✅</span>}
+        {status==='error' && <span style={{fontSize:10,marginLeft:'auto'}}>❌</span>}
+      </div>
+      <div className="node-body">
+        {inputs.map((p,i) => (
+          <div className="port-row" key={`in-${i}`}>
+            <Handle type="target" position={Position.Left}
+              id={p.name} style={{background:TYPE_COLORS[p.port_type]||'#555',width:8,height:8,border:'2px solid #333',left:-5}} />
+            <span className="port-label">{p.name}</span>
+            <span className="port-dot input" style={{background:TYPE_COLORS[p.port_type]||'#555'}}></span>
+          </div>
+        ))}
+        {outputs.map((p,i) => (
+          <div className="port-row" key={`out-${i}`}>
+            <span className="port-dot output" style={{background:TYPE_COLORS[p.port_type]||'#555'}}></span>
+            <span className="port-label" style={{textAlign:'right'}}>{p.name}</span>
+            {nodeResults[p.name] !== undefined && (
+              <span className="port-value">
+                {typeof nodeResults[p.name]==='number' ? nodeResults[p.name].toFixed(4) : String(nodeResults[p.name]).slice(0,20)}
+              </span>
+            )}
+            <Handle type="source" position={Position.Right}
+              id={p.name} style={{background:TYPE_COLORS[p.port_type]||'#555',width:8,height:8,border:'2px solid #333',right:-5}} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const nodeTypes = {skillNode: SkillNode};
+
+// ── Main App ───────────────────────────────────────────────────────────
+
+function App() {
+  const reactFlowInstance = useReactFlow();
+  const [nodes,setNodes,onNodesChange] = useNodesState([]);
+  const [edges,setEdges,onEdgesChange] = useEdgesState([]);
+  const [skills,setSkills] = useState({});
+  const [runStatus,setRunStatus] = useState('idle');
+  const [selectedNode,setSelectedNode] = useState(null);
+  const [paramModal,setParamModal] = useState(null);
+  const [contextMenu,setContextMenu] = useState(null);
+  const nodeIdRef = useRef(0);
+
+  // Load skill registry
+  useEffect(() => {
+    fetch(`${API_BASE}/api/skills`)
+      .then(r=>r.json())
+      .then(setSkills)
+      .catch(e=>console.error('Failed to load skills:',e));
+  }, []);
+
+  // ── Drag & Drop ────────────────────────────────────────────────────
+
+  const onDragOver = useCallback((e) => {e.preventDefault();e.dataTransfer.dropEffect='move';},[]);
+
+  const onDrop = useCallback((e) => {
+    e.preventDefault();
+    const skillId = e.dataTransfer.getData('application/skill-id');
+    if(!skillId || !skills[skillId]) return;
+
+    const skill = skills[skillId];
+    const pos = reactFlowInstance.screenToFlowPosition({x:e.clientX,y:e.clientY});
+    const nid = `node-${++nodeIdRef.current}`;
+
+    const newNode = {
+      id: nid,
+      type: 'skillNode',
+      position: pos,
+      data: {label:skill.name, skill, status:'idle', results:{}, params:{}},
+    };
+    setNodes(nds=>[...nds,newNode]);
+  },[skills,reactFlowInstance,setNodes]);
+
+  // ── Connect ─────────────────────────────────────────────────────────
+
+  const onConnect = useCallback((params) => {
+    setEdges(eds=>addEdge({...params,animated:true,style:{stroke:'#e94560',strokeWidth:2}},eds));
+  },[setEdges]);
+
+  // ── Node Click / Context Menu ───────────────────────────────────────
+
+  const onNodeClick = useCallback((e,node) => {
+    setSelectedNode(node);
+    // Double-click to edit params
+    if(e.detail === 2) {
+      setParamModal({node});
+    }
+  },[]);
+
+  const onNodeContextMenu = useCallback((e,node) => {
+    e.preventDefault();
+    setContextMenu({x:e.clientX, y:e.clientY, node});
+  },[setContextMenu]);
+
+  const onPaneClick = useCallback(() => {
+    setContextMenu(null);
+    setSelectedNode(null);
+  },[]);
+
+  // ── Run ─────────────────────────────────────────────────────────────
+
+  const onRun = useCallback(async () => {
+    setRunStatus('running');
+    const payload = {
+      nodes: nodes.map(n=>({
+        id:n.id,
+        skill_id:n.data.skill?.skill_id,
+        params:n.data.params||{},
+      })),
+      edges: edges.map(e=>({
+        source: `${e.source}.${e.sourceHandle}`,
+        target: `${e.target}.${e.targetHandle}`,
+      })),
+    };
+
+    // Mark all nodes as idle
+    setNodes(nds=>nds.map(n=>({...n,data:{...n.data,status:'idle',results:{}}})));
+
+    try {
+      const resp = await fetch(`${API_BASE}/api/execute`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      const results = data.results || {};
+
+      // Update nodes with results
+      setNodes(nds=>nds.map(n=>{
+        const nodeResult = results[n.id];
+        if(nodeResult) {
+          const hasError = nodeResult.error !== undefined;
+          return {
+            ...n,
+            data:{...n.data, status: hasError ? 'error' : 'done', results:nodeResult}
+          };
+        }
+        return {...n,data:{...n.data,status:'error',results:{error:'No result'}}};
+      }));
+      setRunStatus('done');
+    } catch(e) {
+      setRunStatus('error');
+      setNodes(nds=>nds.map(n=>({...n,data:{...n.data,status:'error',results:{error:String(e)}}})));
+    }
+  },[nodes,edges,setNodes]);
+
+  // ── Context Menu Actions ────────────────────────────────────────────
+
+  const ctxDelete = useCallback(() => {
+    if(contextMenu?.node) {
+      setNodes(nds=>nds.filter(n=>n.id!==contextMenu.node.id));
+      setEdges(eds=>eds.filter(e=>e.source!==contextMenu.node.id && e.target!==contextMenu.node.id));
+    }
+    setContextMenu(null);
+  },[contextMenu,setNodes,setEdges]);
+
+  const ctxDuplicate = useCallback(() => {
+    if(contextMenu?.node) {
+      const src = contextMenu.node;
+      const nid = `node-${++nodeIdRef.current}`;
+      const newNode = {
+        ...src,
+        id:nid,
+        position:{x:src.position.x+50,y:src.position.y+50},
+        data:{...src.data,status:'idle',results:{}},
+        selected:false,
+      };
+      setNodes(nds=>[...nds,newNode]);
+    }
+    setContextMenu(null);
+  },[contextMenu,setNodes]);
+
+  const ctxEditParams = useCallback(() => {
+    if(contextMenu?.node) {
+      setParamModal({node:contextMenu.node});
+    }
+    setContextMenu(null);
+  },[contextMenu]);
+
+  // ── Keyboard Shortcuts ──────────────────────────────────────────────
+
+  useEffect(() => {
+    const handler = (e) => {
+      if(e.key==='Delete' && selectedNode) {
+        setNodes(nds=>nds.filter(n=>n.id!==selectedNode.id));
+        setEdges(eds=>eds.filter(e=>e.source!==selectedNode.id && e.target!==selectedNode.id));
+        setSelectedNode(null);
+      }
+      if(e.ctrlKey && e.key==='Enter') {
+        onRun();
+      }
+    };
+    window.addEventListener('keydown',handler);
+    return ()=>window.removeEventListener('keydown',handler);
+  },[selectedNode,setNodes,setEdges,onRun]);
+
+  // ── Initial demo nodes ──────────────────────────────────────────────
+
+  useEffect(() => {
+    if(nodes.length===0 && Object.keys(skills).length>0) {
+      const demoNodes = [
+        {id:'n1',type:'skillNode',position:{x:80,y:100},
+         data:{label:'Mesh',skill:skills.mesh_builder,status:'idle',results:{},params:{nx:20,ny:20,dx:0.75,dy:0.75,boundary_x:'reflective',boundary_y:'reflective'}}},
+        {id:'n2',type:'skillNode',position:{x:80,y:300},
+         data:{label:'Materials',skill:skills.material_registry,status:'idle',results:{},params:{materials:{core:{name:'Core',xs_provider:'constant'},blanket:{name:'Blanket',xs_provider:'constant'},reflector:{name:'Reflector',xs_provider:'constant'}}}}},
+        {id:'n3',type:'skillNode',position:{x:80,y:500},
+         data:{label:'XS Provider',skill:skills.xs_provider,status:'idle',results:{},params:{group_count:2,materials_xs:{core:{D:[1.4,0.4],Sigma_a:[0.01,0.08],nuSigma_f:[0.006,0.12],Sigma_s:[[0,0.02],[0,0]],chi:[1,0],kappaSigma_f:[1,1]},blanket:{D:[1.4,0.4],Sigma_a:[0.005,0.04],nuSigma_f:[0,0],Sigma_s:[[0,0.02],[0,0]],chi:[0,0],kappaSigma_f:[0,0]},reflector:{D:[1.2,0.3],Sigma_a:[0.001,0.01],nuSigma_f:[0,0],Sigma_s:[[0,0.03],[0,0]],chi:[0,0],kappaSigma_f:[0,0]}}}}},
+        {id:'n4',type:'skillNode',position:{x:450,y:200},
+         data:{label:'Solver',skill:skills.diffusion_solver,status:'idle',results:{},params:{mode:'auto',backend:'cpu',tolerance:1e-8}},
+        },
+        {id:'n5',type:'skillNode',position:{x:750,y:200},
+         data:{label:'Renderer',skill:skills.renderer,status:'idle',results:{},params:{plot_type:'heatmap_2d'}},
+        },
+      ];
+      const demoEdges = [
+        {id:'e14',source:'n1',target:'n4',sourceHandle:'mesh',targetHandle:'mesh',animated:true,style:{stroke:'#e94560',strokeWidth:2}},
+        {id:'e34',source:'n3',target:'n4',sourceHandle:'xs_provider',targetHandle:'xs_provider',animated:true,style:{stroke:'#e94560',strokeWidth:2}},
+        {id:'e45',source:'n4',target:'n5',sourceHandle:'flux',targetHandle:'flux',animated:true,style:{stroke:'#e94560',strokeWidth:2}},
+      ];
+      setNodes(demoNodes);
+      setEdges(demoEdges);
+      nodeIdRef.current = 10;
+    }
+  },[skills]);
+
+  // ── Render ──────────────────────────────────────────────────────────
+
+  return (
+    <>
+      <div className="sidebar">
+        <h3>🧩 Skills</h3>
+        {Object.entries(skills).map(([id,skill]) => (
+          <div key={id} className="skill-item"
+            style={{background:skill.color+'22',borderLeft:`3px solid ${skill.color}`}}
+            draggable
+            onDragStart={(e)=>{
+              e.dataTransfer.setData('application/skill-id',id);
+              e.dataTransfer.effectAllowed='move';
+            }}>
+            <span className="skill-dot" style={{background:skill.color}}></span>
+            <div>
+              <div className="skill-name">{skill.name}</div>
+              <div className="skill-desc">{skill.description?.slice(0,60)}</div>
+            </div>
+          </div>
+        ))}
+        <div style={{padding:16,color:'#555',fontSize:11,textAlign:'center',flex:1}}>
+          Drag skills to canvas<br/>
+          Connect ports to wire<br/>
+          Ctrl+Enter to run<br/>
+          Del to delete<br/>
+          Double-click to edit params
+        </div>
+      </div>
+
+      <div className="canvas">
+        <div className="run-bar">
+          <button className="run-btn" onClick={onRun}
+            disabled={runStatus==='running' || nodes.length===0}>
+            {runStatus==='running' ? '⏳ Running...' : '▶ Run'}
+          </button>
+          <span className={`status ${runStatus}`}>
+            {runStatus==='idle' && 'Ready'}
+            {runStatus==='running' && 'Executing DAG...'}
+            {runStatus==='done' && '✅ Complete'}
+            {runStatus==='error' && '❌ Error'}
+          </span>
+          <span style={{marginLeft:'auto',fontSize:12,color:'#555'}}>
+            {nodes.length} nodes | {edges.length} edges
+          </span>
+        </div>
+
+        <ReactFlowProvider>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onNodeClick={onNodeClick}
+            onNodeContextMenu={onNodeContextMenu}
+            onPaneClick={onPaneClick}
+            nodeTypes={nodeTypes}
+            fitView
+            deleteKeyCode="Delete"
+            style={{background:'#1a1a2e'}}
+          >
+            <Controls style={{background:'#16213e',border:'1px solid #0f3460'}} />
+            <Background color="#0f3460" gap={20} />
+            <MiniMap style={{background:'#16213e',border:'1px solid #0f3460'}}
+              nodeColor={(n)=>n.data?.skill?.color||'#607D8B'} />
+          </ReactFlow>
+        </ReactFlowProvider>
+      </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div className="context-menu" style={{left:contextMenu.x,top:contextMenu.y}}
+          onClick={()=>setContextMenu(null)}>
+          <div className="context-item" onClick={ctxEditParams}>⚙️ Edit Parameters</div>
+          <div className="context-item" onClick={ctxDuplicate}>📋 Duplicate</div>
+          <div className="context-item" onClick={ctxDelete} style={{color:'#e94560'}}>🗑️ Delete</div>
+        </div>
+      )}
+
+      {/* Parameter Modal */}
+      {paramModal && (
+        <ParamEditor node={paramModal.node} skills={skills}
+          onSave={(params)=>{
+            setNodes(nds=>nds.map(n=>
+              n.id===paramModal.node.id
+                ? {...n,data:{...n.data,params}}
+                : n
+            ));
+            setParamModal(null);
+          }}
+          onCancel={()=>setParamModal(null)} />
+      )}
+    </>
+  );
+}
+
+// ── Parameter Editor Modal ─────────────────────────────────────────────
+
+function ParamEditor({node,skills,onSave,onCancel}) {
+  const [params,setParams] = useState({...(node.data?.params||{})});
+  const skill = node.data?.skill;
+
+  if(!skill) return null;
+
+  const inputFields = (skill.inputs||[]).filter(p=>p.port_type==='float'||p.port_type==='any');
+
+  return (
+    <div className="param-modal" onClick={e=>e.stopPropagation()}>
+      <h3>⚙️ {skill.name} Parameters</h3>
+      {inputFields.map(p => (
+        <div key={p.name}>
+          <label style={{fontSize:12,color:'#aaa'}}>{p.name} {p.required && '*'}</label>
+          <input value={params[p.name]??''}
+            onChange={e=>setParams({...params,[p.name]:e.target.value})}
+            placeholder={p.description} />
+        </div>
+      ))}
+      <div style={{marginTop:12,display:'flex',justifyContent:'flex-end'}}>
+        <button className="param-cancel" onClick={onCancel}>Cancel</button>
+        <button className="param-save" onClick={()=>onSave(params)}>Save</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Mount ──────────────────────────────────────────────────────────────
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<React.StrictMode>
+  <ReactFlowProvider>
+    <App />
+  </ReactFlowProvider>
+</React.StrictMode>);
+</script>
+</body>
+</html>
